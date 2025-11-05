@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Name & Student ID: Adian Dzananovic, 30067523
+// Task: AT1 - MVP that manages sensors for Sensing4U
+// Date: 04/11/2025
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +10,348 @@ using System.Threading.Tasks;
 
 namespace Sensing4UApp
 {
-    internal class DataProcessor
+    /// <summary>
+    /// Provides functionality for data loading, processing, and navigation 
+    /// between the datasets. Also, it will implement a Singleton pattern
+    /// for consistent access throughout the application.
+    /// </summary>
+    public sealed class DataProcessor
     {
+        private static readonly Lazy<DataProcessor> _instance = new(() => new DataProcessor());
+        /// <summary>
+        /// This provides access to the global instance of the DataProcessor.
+        /// </summary>
+        public static DataProcessor Instance => _instance.Value;
+        /// <summary>
+        /// Gets the collection of datasets, where each dataset is represented
+        /// as a 2D array of <see cref="SensorRecord"/> objects.
+        /// </summary>
+        public List<SensorRecord[,]> Datasets { get; } = new();
+        /// <summary>
+        /// Tracks which dataset is currently active for display or processing.
+        /// </summary>
+        public int CurrentDatasetIndex { get; set; } = -1;
+        /// <summary>
+        /// Lower threshold that's used for status evaluation.
+        /// </summary>
+        public double LowThreshold { get; set; } = 0.0;
+        /// <summary>
+        /// Upper threshold that's used for status evaluation.
+        /// </summary>
+        public double HighThreshold { get; set; } = 100.0;
+        /// <summary>
+        /// Event that is raised to provide feedback messages to the user interface.
+        /// Bool parameter indicates if the message is an error.
+        /// </summary>
+        public event Action<string, bool>? FeedbackRaised;
+        /// <summary>
+        /// Private constructor to enforce Singleton pattern.
+        /// </summary>
+        private DataProcessor() { }
+
+        /// <summary>
+        /// Loads a dataset from a binary file and adds it to the internal list.
+        /// </summary>
+        /// <param name="path">The full file path to the binary file containing the dataset. Cannot be null or empty.</param>
+        /// <returns>The number of records successfully loaded from the dataset.</returns>
+        public int LoadDatasetFromBin(string path)
+        {
+            try
+            {
+                // Using FileManager to load the binary data
+                SensorRecord[,] ds = FileManager.LoadBinary(path);
+
+                if (ds == null)
+                {
+                    RaiseFeedback("Failed to load dataset (file empty or invalid).", true);
+                    return 0;
+                }
+
+                Datasets.Add(ds);
+                // Set as current, if it's the first dataset.
+                if (CurrentDatasetIndex == -1)
+                    CurrentDatasetIndex = 0;
+
+                // Evaluate status for the correct visualization
+                RecalculateStatuses(ds);
+                int totalRecords = ds.GetLength(0) * ds.GetLength(1);
+                RaiseFeedback($"Dataset loaded successfully: {totalRecords} records.", false);
+                return totalRecords;
+            }
+            catch (Exception ex) // Catch all exceptions to provide feedback
+            {
+                RaiseFeedback($"Error loading dataset: {ex.Message}", true);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Saves the currently active dataset to a binary file.
+        /// </summary>
+        /// <param name="path">The file path where the binary data will be saved. The path must be a valid file path and cannot be null or
+        /// empty.</param>
+        public void SaveCurrentToBin(string path)
+        {
+            try
+            {
+                if (CurrentDatasetIndex < 0 || CurrentDatasetIndex >= Datasets.Count)
+                {
+                    RaiseFeedback("No dataset selected to save.", true);
+                    return;
+                }
+
+                // Using FileManager to save the binary data
+                var current = Datasets[CurrentDatasetIndex];
+                FileManager.SaveBinary(path, current);
+                RaiseFeedback("Dataset saved successfully.", false);
+            }
+            catch (Exception ex) // Catch all exceptions to provide feedback
+            {
+                RaiseFeedback($"Error saving dataset: {ex.Message}", true);
+            }
+        }
+
+        /// <summary>
+        /// Updates the lower and upper bounds for acceptable sensor values.
+        /// </summary>
+        /// <param name="lo">The lower bound value. Must be less than or equal to <paramref name="hi"/>.</param>
+        /// <param name="hi">The upper bound value. Must be greater than or equal to <paramref name="lo"/>.</param>
+        public void SetBounds(double lo, double hi)
+        {
+            if (lo > hi)
+            {
+                RaiseFeedback("Lower bound cannot be greater than upper bound.", true);
+                return;
+            }
+
+            LowThreshold = lo;
+            HighThreshold = hi;
+
+            if (CurrentDatasetIndex >= 0 && CurrentDatasetIndex < Datasets.Count)
+            {
+                RecalculateStatuses(Datasets[CurrentDatasetIndex]);
+                RaiseFeedback($"Thresholds updated: Low = {lo}, High = {hi}", false);
+            }
+        }
+
+        /// <summary>
+        /// Evaluates a numeric value and returns its corresponding <see cref="Status"/>
+        /// </summary>
+        /// <param name="value">The value to evaluate.</param>
+        public Status EvaluateStatus(double value)
+        {
+            // Compare the value against the thresholds
+            if (value > HighThreshold)
+                return Status.High;
+            else if (value < LowThreshold)
+                return Status.Low;
+            else
+                return Status.OK;
+        }
+
+        /// <summary>
+        /// Recalculates the CurrentStatus for all records within a dataset.
+        /// </summary>
+        /// <param name="dataset">A 2D array of <see cref="SensorRecord"/> objects representing the dataset to process. Each
+        /// record's status will be updated based on its value.</param>
+        private void RecalculateStatuses(SensorRecord[,] dataset)
+        {
+            int rows = dataset.GetLength(0);
+            int cols = dataset.GetLength(1);
+
+            // Update each record's status based on the current thresholds
+            for (int r = 0; r < rows; r++)
+            {
+                // Update each column in the current row
+                for (int c = 0; c < cols; c++)
+                {
+                    // Evaluate and set the status
+                    dataset[r, c].CurrentStatus = EvaluateStatus(dataset[r, c].Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Advances to the next dataset in the list.
+        /// </summary>
+        public void NextDataset()
+        {
+            if (Datasets.Count == 0) return;
+            // Wrap around to the first dataset if at the end
+            CurrentDatasetIndex = (CurrentDatasetIndex + 1) % Datasets.Count;
+            RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+        }
+
+        /// <summary>
+        /// Switches to the previous dataset in the list.
+        /// to the last dataset.
+        /// </summary>
+        public void PreviousDataset()
+        {
+            if (Datasets.Count == 0) return;
+            // Wrap around to the last dataset if at the start
+            CurrentDatasetIndex = (CurrentDatasetIndex - 1 + Datasets.Count) % Datasets.Count;
+            RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+        }
+
+        /// <summary>
+        /// It will retrieve a specific SensorRecord from the current dataset.
+        /// </summary>
+        /// <param name="row">The row index of the targeted record.</param>
+        /// <param name="col">The column index of the targeted record.</param>
+        public SensorRecord GetRecord(int row, int col)
+        {
+            RequireCurrent();
+            var ds = Datasets[CurrentDatasetIndex];
+            return ds[row, col];
+        }
+
+        /// <summary>
+        /// Returns a 2D array of only numeric values for display or calculations.
+        /// </summary>
+        public double[,] GetGridValues()
+        {
+            RequireCurrent();
+            // Extract the numeric values from the current dataset
+            var ds = Datasets[CurrentDatasetIndex];
+            int rows = ds.GetLength(0);
+            int cols = ds.GetLength(1);
+            // Create a 2D array to hold the values
+            double[,] values = new double[rows, cols];
+            for (int r = 0; r < rows; r++) // Iterate through each row
+            {
+                for (int c = 0; c < cols; c++) // Iterate through each column
+                {
+                    values[r, c] = ds[r, c].Value; // Extract the numeric value
+                }
+            }
+            return values; // Return the 2D array of values
+        }
+
+        /// <summary>
+        /// Calculates the average Value across the current dataset.
+        /// </summary>
+        public double GetAverage()
+        {
+            RequireCurrent();
+            var ds = Datasets[CurrentDatasetIndex]; // Get the current dataset
+            double total = 0; // Accumulator for the sum of values
+            int rows = ds.GetLength(0);
+            int cols = ds.GetLength(1);
+
+            // Sum all the values in the dataset
+            for (int r = 0; r < rows; r++)
+            {
+                // Iterate through each column in the current row
+                for (int c = 0; c < cols; c++)
+                {
+                    // Add the value to the total
+                    total += ds[r, c].Value;
+                }
+            }
+            // Calculate and return the average
+            return rows * cols > 0 ? total / (rows * cols) : 0;
+        }
+
+        /// <summary>
+        /// Sorts the current dataset by a given key (e.g., Label, Value, Id)
+        /// </summary>
+        /// <typeparam name="TKey">The type of the key to sort by.</typeparam>
+        /// <param name="keySelector">A function that selects the key from a SensorRecord.</param>
+        public void SortBy<TKey>(Func<SensorRecord, TKey> keySelector)
+        {
+            RequireCurrent();
+            var ds = Datasets[CurrentDatasetIndex]; // Get the current dataset
+            var flat = ds.Cast<SensorRecord>().OrderBy(keySelector).ToList(); // Flatten and sort
+            int rows = ds.GetLength(0);
+            int cols = ds.GetLength(1);
+            int index = 0; // Index for the sorted list
+
+            // Rebuild the 2D array from the sorted list
+            for (int r = 0; r < rows; r++)
+            {
+                // Iterate through each column in the current row
+                for (int c = 0; c < cols; c++)
+                {
+                    // Assign the sorted record back to the 2D array
+                    ds[r, c] = flat[index++];
+                }
+            }
+
+            RecalculateStatuses(ds); // Re-evaluate statuses after sorting
+            RaiseFeedback("Dataset sorted successfully.", false);
+        }
+
+        /// <summary>
+        /// Searches the current dataset by Label using binary search.
+        /// Returns the (row, col) position of the first matching record, or (-1, -1) if it's not found.
+        /// </summary>
+        /// <param name="label">The label to search for.</param>
+        public (int row, int col) FindByLabel(string label)
+        {
+            RequireCurrent();
+            if (string.IsNullOrEmpty(label)) // Validate input
+            {
+                RaiseFeedback("Search label cannot be empty.", true);
+                return (-1, -1); // Invalid input
+            }
+
+            var ds = Datasets[CurrentDatasetIndex];
+            // Flatten and sort the dataset by Label for binary search
+            var flat = ds.Cast<SensorRecord>().OrderBy(r => r.Label, StringComparer.OrdinalIgnoreCase).ToList();
+            int left = 0;
+            int right = flat.Count - 1;
+            while (left <= right) // Binary search loop
+            {
+                int mid = (left + right) / 2; // Calculate mid index
+                // Compare the mid record's label with the search label
+                int cmp = string.Compare(flat[mid].Label, label, StringComparison.OrdinalIgnoreCase);
+
+                if (cmp == 0) // Match found
+                {
+                    // Locate the record's position in the original 2D array
+                    for (int r = 0; r < ds.GetLength(0); r++)
+                    {
+                        // Iterate through each column in the current row
+                        for (int c = 0; c < ds.GetLength(1); c++)
+                        {
+                            // Check for label match
+                            if (ds[r, c].Label.Equals(label, StringComparison.OrdinalIgnoreCase))
+                            {
+                                RaiseFeedback($"Record '{label}' found at ({r}, {c}).", false);
+                                return (r, c); // Return the position
+                            }
+                        }
+                    }
+                    break; // Shouldn't really reach here anyways
+                }
+                if (cmp < 0) left = mid + 1; // Search in the right half
+                else right = mid - 1; // Search in the left half
+            }
+            RaiseFeedback($"Label '{label}' not found.", true);
+            return (-1, -1); // Not found
+        }
+
+        /// <summary>
+        /// This is to ensure there's a current dataset loaded before performing operations.
+        /// </summary>
+        /// <exception cref="InvalidOperationException"></exception>
+        private void RequireCurrent()
+        {
+            // Validate that a current dataset is selected
+            if (CurrentDatasetIndex < 0 || CurrentDatasetIndex >= Datasets.Count)
+                throw new InvalidOperationException("No dataset loaded."); // No dataset loaded
+        }
+
+        /// <summary>
+        /// Triggers the feedback event safely for the UI.
+        /// </summary>
+        /// <param name="message">The feedback message to send.</param>
+        /// <param name="isError">Indicates if the message is an error.</param>
+        public void RaiseFeedback(string message, bool isError)
+        {
+            // Invoke the feedback event if there are subscribers
+            FeedbackRaised?.Invoke(message, isError);
+        }
     }
 }
