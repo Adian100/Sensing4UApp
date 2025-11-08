@@ -26,7 +26,7 @@ namespace Sensing4UApp
         /// Gets the collection of datasets, where each dataset is represented
         /// as a 2D array of <see cref="SensorRecord"/> objects.
         /// </summary>
-        public List<SensorRecord[,]> Datasets { get; } = new();
+        public List<SensorRecord[,]> Datasets { get; } = [];
         /// <summary>
         /// Tracks which dataset is currently active for display or processing.
         /// </summary>
@@ -44,6 +44,11 @@ namespace Sensing4UApp
         /// Bool parameter indicates if the message is an error.
         /// </summary>
         public event Action<string, bool>? FeedbackRaised;
+        /// <summary>
+        /// Map of labels to their positions in the current dataset.
+        /// Built on demand and rebuilt when the dataset changes.
+        /// </summary>
+        private List<(string Label, int Row, int Col)>? _labelIndex;
         /// <summary>
         /// Private constructor to enforce Singleton pattern.
         /// </summary>
@@ -74,6 +79,7 @@ namespace Sensing4UApp
 
                 // Evaluate status for the correct visualization
                 RecalculateStatuses(ds);
+                BuildLabelIndex();
                 int totalRecords = ds.GetLength(0) * ds.GetLength(1);
                 RaiseFeedback($"Dataset loaded successfully: {totalRecords} records.", false);
                 return totalRecords;
@@ -127,10 +133,16 @@ namespace Sensing4UApp
             LowThreshold = lo;
             HighThreshold = hi;
 
+            // Re-evaluate statuses in the current dataset
             if (CurrentDatasetIndex >= 0 && CurrentDatasetIndex < Datasets.Count)
             {
+                // Update statuses based on new thresholds
                 RecalculateStatuses(Datasets[CurrentDatasetIndex]);
                 RaiseFeedback($"Thresholds updated: Low = {lo}, High = {hi}", false);
+            }
+            else
+            {
+                RaiseFeedback("No dataset loaded. Bounds saved, load a dataset to apply them.", false);
             }
         }
 
@@ -176,22 +188,47 @@ namespace Sensing4UApp
         /// </summary>
         public void NextDataset()
         {
-            if (Datasets.Count == 0) return;
-            // Wrap around to the first dataset if at the end
-            CurrentDatasetIndex = (CurrentDatasetIndex + 1) % Datasets.Count;
-            RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+            if (Datasets.Count == 0) 
+            {
+                RaiseFeedback("No dataset loaded.", true);
+                return;
+            }
+            // Only advance if not at the last dataset
+            if (CurrentDatasetIndex < Datasets.Count - 1)
+            {
+                CurrentDatasetIndex++; // Move to the next dataset
+                _labelIndex = null; // Invalidate the label index
+                BuildLabelIndex(); // Rebuild the label index for the new dataset
+                RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+            }
+            else
+            {
+                RaiseFeedback("Already at the last dataset.", false);
+            }
         }
 
         /// <summary>
         /// Switches to the previous dataset in the list.
-        /// to the last dataset.
         /// </summary>
         public void PreviousDataset()
         {
-            if (Datasets.Count == 0) return;
-            // Wrap around to the last dataset if at the start
-            CurrentDatasetIndex = (CurrentDatasetIndex - 1 + Datasets.Count) % Datasets.Count;
-            RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+            if (Datasets.Count == 0)
+            {
+                RaiseFeedback("No dataset loaded.", true);
+                return;
+            }
+            // Only go back if not at the first dataset
+            if (CurrentDatasetIndex > 0)
+            {
+                CurrentDatasetIndex--; // Move to the previous dataset
+                _labelIndex = null; // Invalidate the label index
+                BuildLabelIndex(); // Rebuild the label index for the new dataset
+                RaiseFeedback($"Switched to dataset #{CurrentDatasetIndex + 1}", false);
+            }
+            else
+            {
+                RaiseFeedback("Already at the first dataset.", false);
+            }
         }
 
         /// <summary>
@@ -279,6 +316,7 @@ namespace Sensing4UApp
             }
 
             RecalculateStatuses(ds); // Re-evaluate statuses after sorting
+            BuildLabelIndex(); // Rebuild the label index
             RaiseFeedback("Dataset sorted successfully.", false);
         }
 
@@ -290,46 +328,55 @@ namespace Sensing4UApp
         public (int row, int col) FindByLabel(string label)
         {
             RequireCurrent();
-            if (string.IsNullOrEmpty(label)) // Validate input
+            if (string.IsNullOrWhiteSpace(label)) // Validate input
             {
                 RaiseFeedback("Search label cannot be empty.", true);
                 return (-1, -1); // Invalid input
             }
 
-            var ds = Datasets[CurrentDatasetIndex];
-            // Flatten and sort the dataset by Label for binary search
-            var flat = ds.Cast<SensorRecord>().OrderBy(r => r.Label, StringComparer.OrdinalIgnoreCase).ToList();
-            int left = 0;
-            int right = flat.Count - 1;
-            while (left <= right) // Binary search loop
-            {
-                int mid = (left + right) / 2; // Calculate mid index
-                // Compare the mid record's label with the search label
-                int cmp = string.Compare(flat[mid].Label, label, StringComparison.OrdinalIgnoreCase);
+            // Build the label index if it hasn't been built yet
+            if (_labelIndex is null) BuildLabelIndex();
+            int i = _labelIndex!.BinarySearch( // Perform binary search
+                (label, 0, 0), // The search key
+                Comparer<(string Label, int Row, int Col)>.Create( // Custom comparer for case-insensitive comparison
+                    (a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase))); // Search in the label index
 
-                if (cmp == 0) // Match found
-                {
-                    // Locate the record's position in the original 2D array
-                    for (int r = 0; r < ds.GetLength(0); r++)
-                    {
-                        // Iterate through each column in the current row
-                        for (int c = 0; c < ds.GetLength(1); c++)
-                        {
-                            // Check for label match
-                            if (ds[r, c].Label.Equals(label, StringComparison.OrdinalIgnoreCase))
-                            {
-                                RaiseFeedback($"Record '{label}' found at ({r}, {c}).", false);
-                                return (r, c); // Return the position
-                            }
-                        }
-                    }
-                    break; // Shouldn't really reach here anyways
-                }
-                if (cmp < 0) left = mid + 1; // Search in the right half
-                else right = mid - 1; // Search in the left half
+            if (i >= 0) // If found
+            {
+                var hit = _labelIndex[i]; // Retrieve the found record
+                // Provide feedback and return the position
+                RaiseFeedback($"Record '{label}' found at ({hit.Row}, {hit.Col}).", false);
+                return (hit.Row, hit.Col); // Return the position
             }
             RaiseFeedback($"Label '{label}' not found.", true);
             return (-1, -1); // Not found
+        }
+
+        /// <summary>
+        /// Builds or rebuilds the sorted label index for the current dataset.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown if there is no current dataset loaded.
+        /// </exception>
+        private void BuildLabelIndex()
+        {
+            RequireCurrent();
+            var ds = Datasets[CurrentDatasetIndex]; // Get the current dataset
+            // Build the list of labels with their positions
+            var list = new List<(string Label, int Row, int Col)>(ds.Length);
+            // Loop through all rows and columns of the dataset
+            for (int r = 0; r < ds.GetLength(0); r++)
+            {
+                for (int c = 0; c < ds.GetLength(1); c++)
+                {
+                    // Add the label and its position to the list
+                    // Use empty string if label is null
+                    list.Add((ds[r, c].Label ?? string.Empty, r, c));
+                }
+            }
+            // Sort the list by label for binary search
+            list.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
+            _labelIndex = list; // Save the sorted list as the active label index
         }
 
         /// <summary>

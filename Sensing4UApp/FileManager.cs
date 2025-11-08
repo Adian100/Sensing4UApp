@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace Sensing4UApp
@@ -50,7 +51,9 @@ namespace Sensing4UApp
                     var rec = ds[r, c];
                     bw.Write(rec.Id);
                     bw.Write(rec.Timestamp.ToBinary());
-                    bw.Write(rec.Label);
+                    var labelBytes = Encoding.UTF8.GetBytes(rec.Label ?? string.Empty);
+                    bw.Write(labelBytes.Length);
+                    bw.Write(labelBytes);
                     bw.Write(rec.Value);
                     bw.Write((byte)rec.CurrentStatus);
                 }
