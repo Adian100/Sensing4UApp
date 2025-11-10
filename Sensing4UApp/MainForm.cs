@@ -18,6 +18,7 @@ namespace Sensing4UApp
     {
         private readonly DataProcessor _proc = DataProcessor.Instance;
 
+        #region Constructor and Initialization
         /// <summary>
         /// Initializes the main window and configures event handlers,
         /// form size, title, and the legend in the status strip.
@@ -57,11 +58,10 @@ namespace Sensing4UApp
             legendOk.Margin = new Padding(4, 2, 4, 2);
             legendHigh.Margin = new Padding(4, 2, 4, 2);
             legendLow.Margin = new Padding(4, 2, 4, 2);
+        } 
+        #endregion
 
-        }
-
-        // Menu
-
+        #region Menu, Bounds, Search & Navigation
         /// <summary>
         /// Handles the click event for the Load menu item.
         /// Opens a file dialog to load a binary dataset file.
@@ -93,9 +93,9 @@ namespace Sensing4UApp
         /// Handles the click event for the Next Dataset button.
         /// </summary>
         private void ButtonNextDataset_Click(object sender, EventArgs e) => OnNextClicked();
+        #endregion
 
-        // Grid colouring
-
+        #region DataGridView Cell Formatting
         /// <summary>
         /// Colours each cell in the DataGridView based on the status tag (OK/High/Low).
         /// </summary>
@@ -114,9 +114,9 @@ namespace Sensing4UApp
                 else if (s == Status.Low) e.CellStyle.BackColor = Color.LightBlue;
             }
         }
+        #endregion
 
-        // UI methods
-
+        #region Private Methods for User Actions (UI)
         /// <summary>
         /// Loads a dataset from a binary file and updates the grid display.
         /// </summary>
@@ -176,6 +176,9 @@ namespace Sensing4UApp
         /// Searches the current active dataset for a record by its label.
         /// Highlights the matching cell if found.
         /// </summary>
+        #endregion
+
+        #region Binary Search by Label
         private void OnSearchLabel(string? label = null)
         {
             // Ensure a dataset is loaded before searching
@@ -206,7 +209,9 @@ namespace Sensing4UApp
                 ShowFeedback(ex.Message, true);
             }
         }
+        #endregion
 
+        #region Private Helper Methods
         /// <summary>
         /// Populates the DataGridView with values and labels from the current dataset.
         /// Each cell includes a tooltip describing its status (OK/High/Low).
@@ -256,5 +261,6 @@ namespace Sensing4UApp
             toolStripStatusLabelMessage.Text = "Ready";
             toolStripStatusLabelMessage.ForeColor = Color.Black;
         }
+        #endregion
     }
 }

@@ -17,6 +17,7 @@ namespace Sensing4UApp
     /// </summary>
     public sealed class DataProcessor
     {
+        #region Singleton Implementation and Fields
         private static readonly Lazy<DataProcessor> _instance = new(() => new DataProcessor());
         /// <summary>
         /// This provides access to the global instance of the DataProcessor.
@@ -53,7 +54,9 @@ namespace Sensing4UApp
         /// Private constructor to enforce Singleton pattern.
         /// </summary>
         private DataProcessor() { }
+        #endregion
 
+        #region Dataset Management
         /// <summary>
         /// Loads a dataset from a binary file and adds it to the internal list.
         /// </summary>
@@ -116,7 +119,9 @@ namespace Sensing4UApp
                 RaiseFeedback($"Error saving dataset: {ex.Message}", true);
             }
         }
+        #endregion
 
+        #region Upper and Lower Bounds Management
         /// <summary>
         /// Updates the lower and upper bounds for acceptable sensor values.
         /// </summary>
@@ -182,7 +187,9 @@ namespace Sensing4UApp
                 }
             }
         }
+        #endregion
 
+        #region Dataset Navigation and Processing
         /// <summary>
         /// Advances to the next dataset in the list.
         /// </summary>
@@ -230,7 +237,9 @@ namespace Sensing4UApp
                 RaiseFeedback("Already at the first dataset.", false);
             }
         }
+        #endregion
 
+        #region Data Retrieval and Calculation
         /// <summary>
         /// It will retrieve a specific SensorRecord from the current dataset.
         /// </summary>
@@ -289,7 +298,9 @@ namespace Sensing4UApp
             // Calculate and return the average
             return rows * cols > 0 ? total / (rows * cols) : 0;
         }
+        #endregion
 
+        #region Sorting and Searching
         /// <summary>
         /// Sorts the current dataset by a given key (e.g., Label, Value, Id)
         /// </summary>
@@ -378,7 +389,9 @@ namespace Sensing4UApp
             list.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
             _labelIndex = list; // Save the sorted list as the active label index
         }
+        #endregion
 
+        #region Validation and Feedback
         /// <summary>
         /// This is to ensure there's a current dataset loaded before performing operations.
         /// </summary>
@@ -400,5 +413,6 @@ namespace Sensing4UApp
             // Invoke the feedback event if there are subscribers
             FeedbackRaised?.Invoke(message, isError);
         }
+        #endregion
     }
 }

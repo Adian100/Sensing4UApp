@@ -22,6 +22,7 @@ namespace Sensing4UApp
         /// </summary>
         private const string Magic = "S4U1";
 
+        #region Save Operations
         /// <summary>
         /// Saves the 2D array of sensor records to a binary file at the path.
         /// </summary>
@@ -59,7 +60,9 @@ namespace Sensing4UApp
                 }
             }
         }
+        #endregion
 
+        #region Load Operations
         /// <summary>
         /// Loads binary data from the file and initializes a 2D array of <see
         /// cref="SensorRecord"/>.
@@ -121,5 +124,6 @@ namespace Sensing4UApp
             }
             return data;
         }
+        #endregion
     }
 }
