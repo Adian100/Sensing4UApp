@@ -338,29 +338,7 @@ namespace Sensing4UApp
         /// <param name="label">The label to search for.</param>
         public (int row, int col) FindByLabel(string label)
         {
-            RequireCurrent();
-            if (string.IsNullOrWhiteSpace(label)) // Validate input
-            {
-                RaiseFeedback("Search label cannot be empty.", true);
-                return (-1, -1); // Invalid input
-            }
-
-            // Build the label index if it hasn't been built yet
-            if (_labelIndex is null) BuildLabelIndex();
-            int i = _labelIndex!.BinarySearch( // Perform binary search
-                (label, 0, 0), // The search key
-                Comparer<(string Label, int Row, int Col)>.Create( // Custom comparer for case-insensitive comparison
-                    (a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase))); // Search in the label index
-
-            if (i >= 0) // If found
-            {
-                var hit = _labelIndex[i]; // Retrieve the found record
-                // Provide feedback and return the position
-                RaiseFeedback($"Record '{label}' found at ({hit.Row}, {hit.Col}).", false);
-                return (hit.Row, hit.Col); // Return the position
-            }
-            RaiseFeedback($"Label '{label}' not found.", true);
-            return (-1, -1); // Not found
+           
         }
 
         /// <summary>
