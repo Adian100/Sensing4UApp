@@ -332,13 +332,46 @@ namespace Sensing4UApp
         }
 
         /// <summary>
-        /// Searches the current dataset by Label using binary search.
+        /// Searches the current dataset by Label using custom binary search.
         /// Returns the (row, col) position of the first matching record, or (-1, -1) if it's not found.
         /// </summary>
         /// <param name="label">The label to search for.</param>
         public (int row, int col) FindByLabel(string label)
         {
-           
+            RequireCurrent();
+            int low = 0; // Start of the search range
+            int high = _labelIndex!.Count - 1; // End of the search range
+            while (low <= high)
+            {
+                // Calculate the mid index
+                int mid = (low + high) / 2; 
+                var midEntry = _labelIndex![mid];
+                string midLabel = midEntry.Label;
+                
+                // Compare the search label with the current middle label
+                int comparison = string.Compare(
+                    midLabel, label, StringComparison.Ordinal);
+
+                if (comparison == 0)
+                {
+                    RaiseFeedback(
+                        $"Record '{label}' found at ({midEntry.Row}, {midEntry.Col}",
+                        false);
+                    return (midEntry.Row, midEntry.Col);
+                }
+                else if (comparison < 0)
+                {
+                    // Search left half
+                    high = mid - 1;
+                }
+                else
+                {
+                    // Search right half 
+                    low = mid + 1;
+                }
+            }
+            RaiseFeedback($"Label '{label}' not found.", true);
+            return (-1, -1);
         }
 
         /// <summary>
