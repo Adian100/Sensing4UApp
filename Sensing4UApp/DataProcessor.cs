@@ -357,12 +357,12 @@ namespace Sensing4UApp
                 
                 // Compare the search label with the current middle label
                 int comparison = string.Compare(
-                    label, midLabel, StringComparison.Ordinal);
+                    label, midLabel, StringComparison.OrdinalIgnoreCase);
 
-                if (comparison == 0)
+                if (comparison == 0) 
                 {
                     RaiseFeedback(
-                        $"Record '{label}' found at ({midEntry.Row}, {midEntry.Col}",
+                        $"Record '{label}' found at ({midEntry.Row}, {midEntry.Col})",
                         false);
                     return (midEntry.Row, midEntry.Col);
                 }
