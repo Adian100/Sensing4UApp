@@ -76,9 +76,8 @@ namespace Sensing4UApp
                 }
 
                 Datasets.Add(ds);
-                // Set as current, if it's the first dataset.
-                if (CurrentDatasetIndex == -1)
-                    CurrentDatasetIndex = 0;
+                // Always switch to the newly loaded dataset.
+                CurrentDatasetIndex = Datasets.Count - 1;
 
                 // Evaluate status for the correct visualization
                 RecalculateStatuses(ds);
