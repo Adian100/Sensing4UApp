@@ -350,7 +350,7 @@ namespace Sensing4UApp
                 
                 // Compare the search label with the current middle label
                 int comparison = string.Compare(
-                    midLabel, label, StringComparison.Ordinal);
+                    label, midLabel, StringComparison.Ordinal);
 
                 if (comparison == 0)
                 {
