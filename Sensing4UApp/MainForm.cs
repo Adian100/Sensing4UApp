@@ -190,19 +190,28 @@ namespace Sensing4UApp
 
             try
             {
+                // Error handling for empty search input
                 label ??= textBoxSearch.Text?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(label))
+                {
+                    ShowFeedback("Search label cannot be empty.", true);
+                    return;
+                }
                 var (row, col) = _proc.FindByLabel(label);
                 if (row >= 0 && col >= 0)
                 {
-                    // Highlight the found cell and scroll into view
+                    // Highlight the found cell in the DataGridView
                     dataGridViewSensors.ClearSelection();
                     dataGridViewSensors.CurrentCell = dataGridViewSensors[col, row];
                     dataGridViewSensors[col, row].Selected = true;
+
                     if (row >= 0 && row < dataGridViewSensors.RowCount)
                         dataGridViewSensors.FirstDisplayedScrollingRowIndex = Math.Max(0, row - 3);
-                    ShowFeedback($"Found '{label}' at ({row}, {col}).", false);
                 }
-                else ShowFeedback($"Label '{label}' not found.", true);
+                else
+                {
+
+                }
             }
             catch (Exception ex)
             {
