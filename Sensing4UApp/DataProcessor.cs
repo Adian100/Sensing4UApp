@@ -339,6 +339,13 @@ namespace Sensing4UApp
         public (int row, int col) FindByLabel(string label)
         {
             RequireCurrent();
+            // Binary search requires a sorted label index
+            // Rebuild if it's missing or empty
+            if (_labelIndex is null || _labelIndex.Count == 0)
+            {
+                BuildLabelIndex();
+            }
+
             int low = 0; // Start of the search range
             int high = _labelIndex!.Count - 1; // End of the search range
             while (low <= high)
