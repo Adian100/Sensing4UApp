@@ -262,13 +262,10 @@ namespace Sensing4UApp
         /// Displays feedback messages in the StatusStrip for 5 seconds,
         /// then changes to 'Ready'. Colour indicates success or error.
         /// </summary>
-        private async void ShowFeedback(string msg, bool isError)
+        private void ShowFeedback(string msg, bool isError)
         {
             toolStripStatusLabelMessage.Text = msg;
             toolStripStatusLabelMessage.ForeColor = isError ? Color.DarkRed : Color.DarkGreen;
-            await Task.Delay(5000); // Wait for 5 seconds before resetting the status message
-            toolStripStatusLabelMessage.Text = "Ready";
-            toolStripStatusLabelMessage.ForeColor = Color.Black;
         }
         #endregion
     }
