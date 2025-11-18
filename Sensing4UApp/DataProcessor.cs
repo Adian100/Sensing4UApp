@@ -361,7 +361,7 @@ namespace Sensing4UApp
                 if (comparison == 0) 
                 {
                     RaiseFeedback(
-                        $"Record '{label}' found at ({midEntry.Row}, {midEntry.Col})",
+                        $"Found '{label}' at ({midEntry.Row}, {midEntry.Col}).",
                         false);
                     return (midEntry.Row, midEntry.Col);
                 }
